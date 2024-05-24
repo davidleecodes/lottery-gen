@@ -35,8 +35,8 @@ function Numbers() {
     dayjs(),
   ]);
 
-  const [genNumResults, setGenNumResults] = useState([]);
-  const [genCBResults, setGenCBResults] = useState([]);
+  const [genNumResults, setGenNumResults] = useState<number[]>([]);
+  const [genCBResults, setGenCBResults] = useState<string>("");
   useEffect(() => {
     if (csvData.length > 0) {
       console.log(csvData[0].drawDate, csvData[csvData.length - 2].drawDate);
@@ -176,21 +176,22 @@ function Numbers() {
     return result;
   }
 
-  function getRandom(obj) {
+  function getRandom(obj: NumDataGroup) {
     console.log(obj);
     // Create an array to hold the keys and their cumulative percentages
-    let cumulativePercentages = [];
+    const cumulativePercentages: { key: string; cumulative: number }[] = [];
     let cumulativeSum = 0;
-    let res = null;
+    let res = "";
 
     // Populate the cumulative percentages array
-    for (let key in obj) {
+    // eslint-disable-next-line prefer-const
+    Object.keys(obj).forEach((key) => {
       cumulativeSum += obj[key].percentage;
       cumulativePercentages.push({ key: key, cumulative: cumulativeSum });
-    }
+    });
 
     // Generate a random number between 0 and 100
-    let random = Math.random() * 100;
+    const random = Math.random() * 100;
 
     // Find the key corresponding to the random number
     for (let i = 0; i < cumulativePercentages.length; i++) {
@@ -211,9 +212,9 @@ function Numbers() {
     // eslint-disable-next-line prefer-const
     let numsGen: number[] = [];
     for (let i = 0; i < 5; i++) {
-      let res = getRandom(nums);
+      let res = Number(getRandom(nums));
       while (numsGen.includes(res)) {
-        res = getRandom(nums);
+        res = Number(getRandom(nums));
       }
       numsGen.push(res);
     }
@@ -328,7 +329,7 @@ function Numbers() {
             <div
               key={key}
               className={`item ${
-                genNumResults.includes(key.toString()) ? "highlight" : ""
+                genNumResults.includes(key) ? "highlight" : ""
               }`}
               style={{
                 backgroundColor: `color-mix(in srgb, blue  ${
@@ -352,9 +353,7 @@ function Numbers() {
           {Object.entries(cbNums).map(([key, value]) => (
             <div
               key={key}
-              className={`item ${
-                genCBResults.includes(key) ? "highlight" : ""
-              }`}
+              className={`item ${genCBResults === key ? "highlight" : ""}`}
               style={{
                 backgroundColor: `color-mix(in srgb, red  ${value.mapped}%, transparent)`,
               }}
