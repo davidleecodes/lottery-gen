@@ -1,14 +1,18 @@
 import { useEffect, useState } from "react";
-import { DatePicker, Checkbox, Button } from "antd";
+import { DatePicker, Checkbox, Button, Space } from "antd";
 import { RangePickerProps } from "antd/lib/date-picker";
 import { daysShort } from "./utils";
-// import dayjs from "dayjs";
 import dayjs from "dayjs";
-// import dayjs,{Dayjs} from "dayjs";
-type CSVData = {
-  drawDate: string;
-  winningNumbers: number[];
-  cashBall: number;
+
+type ResponseData = {
+  draw_date: string;
+  winning_numbers: string;
+  cash_ball: string;
+};
+type DrawData = {
+  draw_date: dayjs.Dayjs;
+  winning_numbers: number[];
+  cash_ball: number;
 };
 
 type NumData = {
@@ -23,10 +27,10 @@ const { RangePicker } = DatePicker;
 
 function Numbers() {
   const allNums = new Array(60).fill(0).map((_, i) => i + 1);
-  const [csvData, setCSVData] = useState<CSVData[]>([]);
-  const [filteredData, setfilteredData] = useState<CSVData[]>([]);
+  const [csvData, setCSVData] = useState<DrawData[]>([]);
+  const [filteredData, setfilteredData] = useState<DrawData[]>([]);
 
-  const [nums, setNums] = useState<NumDataGroup>({});
+  const [winNums, setWinNums] = useState<NumDataGroup>({});
   const [cbNums, setcbNums] = useState<NumDataGroup>({});
 
   const [selectedDays, setSelectedDays] = useState(daysShort);
@@ -35,14 +39,15 @@ function Numbers() {
     dayjs(),
   ]);
 
-  const [genNumResults, setGenNumResults] = useState<number[]>([]);
+  const [genWinNumResults, setGenWinNumResults] = useState<number[]>([]);
   const [genCBResults, setGenCBResults] = useState<string>("");
+
   useEffect(() => {
     if (csvData.length > 0) {
-      console.log(csvData[0].drawDate, csvData[csvData.length - 2].drawDate);
+      console.log(csvData[0].draw_date, csvData[csvData.length - 2].draw_date);
       setDateRange([
-        dayjs(csvData[csvData.length - 2].drawDate),
-        dayjs(csvData[0].drawDate),
+        dayjs(csvData[csvData.length - 2].draw_date),
+        dayjs(csvData[0].draw_date),
       ]);
     }
   }, [csvData]);
@@ -50,14 +55,14 @@ function Numbers() {
   useEffect(() => {
     console.log("days", selectedDays);
     const filtered = csvData.filter((result) => {
-      const drawDate = dayjs(result.drawDate);
-      const drawDateWkDay = drawDate.format("ddd");
+      const draw_date = result.draw_date;
+      const drawDateWkDay = draw_date.format("ddd");
       let res = selectedDays.includes(drawDateWkDay);
       if (dateRange) {
         res =
           res &&
-          drawDate.isAfter(dateRange[0]) &&
-          drawDate.isBefore(dateRange[1]);
+          draw_date.isAfter(dateRange[0]) &&
+          draw_date.isBefore(dateRange[1]);
       }
       return res;
     });
@@ -66,7 +71,24 @@ function Numbers() {
   }, [selectedDays, dateRange]);
 
   useEffect(() => {
-    fetchCsv();
+    async function fetchData() {
+      const response = await fetch(
+        "https://data.ny.gov/resource/kwxv-fwze.json"
+      ).then((response) => response.json());
+      const data = response.map((ent: ResponseData) => {
+        return {
+          draw_date: dayjs(ent.draw_date),
+          winning_numbers: ent.winning_numbers
+            ? ent.winning_numbers.split(" ").map((n) => Number(n))
+            : [],
+          cash_ball: Number(ent.cash_ball),
+        };
+      });
+      setCSVData(data);
+      setfilteredData(data);
+      console.log("res", response);
+    }
+    fetchData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -77,16 +99,16 @@ function Numbers() {
     const winningNumbersObj: NumDataGroup = {};
 
     filteredData.forEach((result) => {
-      const cashBall = result.cashBall;
-      const winningNumbers = result.winningNumbers;
-      winningNumbers.forEach((num) => {
+      const cash_ball = result.cash_ball;
+      const winning_numbers = result.winning_numbers;
+      winning_numbers.forEach((num) => {
         winningNumbersFrequency[num] = winningNumbersFrequency[num]
           ? winningNumbersFrequency[num] + 1
           : 1;
       });
-      if (!isNaN(cashBall)) {
-        cashBallFrequency[cashBall] = cashBallFrequency[cashBall]
-          ? cashBallFrequency[cashBall] + 1
+      if (!isNaN(cash_ball)) {
+        cashBallFrequency[cash_ball] = cashBallFrequency[cash_ball]
+          ? cashBallFrequency[cash_ball] + 1
           : 1;
       }
     });
@@ -94,7 +116,7 @@ function Numbers() {
     const cashBallVals = Object.values(cashBallFrequency);
     const cashBallValsMin = Math.min(...cashBallVals);
     const cashBallValsMax = Math.max(...cashBallVals);
-    console.log(cashBallValsMin, cashBallValsMax);
+    console.log(cashBallVals, cashBallValsMin, cashBallValsMax);
     Object.keys(cashBallFrequency).forEach((key) => {
       cashBallObj[key] = {
         frequency: cashBallFrequency[key],
@@ -127,7 +149,7 @@ function Numbers() {
       };
     });
     setcbNums(cashBallObj);
-    setNums(winningNumbersObj);
+    setWinNums(winningNumbersObj);
     console.log(cashBallObj);
     console.log(winningNumbersObj);
     // let winningNumbersObjSorted = Object.entries(winningNumbersObj).sort(
@@ -144,36 +166,6 @@ function Numbers() {
     outMax: number
   ) {
     return ((x - inMin) * (outMax - outMin)) / (inMax - inMin) + outMin;
-  }
-
-  async function fetchCsv() {
-    const response = await fetch(
-      "Lottery_Cash_4_Life_Winning_Numbers__Beginning_2014_20240519.csv"
-    ).then((response) => response.text());
-    const csv = parseCSV(response);
-    setCSVData(csv);
-    setfilteredData(csv);
-    console.log(csvData);
-  }
-
-  function parseCSV(data: string): CSVData[] {
-    const lines = data.split("\n");
-    const result: CSVData[] = [];
-
-    for (let i = 1; i < lines.length; i++) {
-      const currentLine = lines[i].split(",");
-      const obj = {
-        drawDate: currentLine[0],
-        winningNumbers: currentLine[1]
-          ? currentLine[1].split(" ").map((n) => Number(n))
-          : [],
-        cashBall: Number(currentLine[2]),
-      };
-
-      result.push(obj);
-    }
-
-    return result;
   }
 
   function getRandom(obj: NumDataGroup) {
@@ -212,14 +204,14 @@ function Numbers() {
     // eslint-disable-next-line prefer-const
     let numsGen: number[] = [];
     for (let i = 0; i < 5; i++) {
-      let res = Number(getRandom(nums));
+      let res = Number(getRandom(winNums));
       while (numsGen.includes(res)) {
-        res = Number(getRandom(nums));
+        res = Number(getRandom(winNums));
       }
       numsGen.push(res);
     }
     setGenCBResults(cbGen);
-    setGenNumResults(numsGen.sort((a, b) => a - b));
+    setGenWinNumResults(numsGen.sort((a, b) => a - b));
     console.log(numsGen.sort((a, b) => a - b).toString());
     console.log(cbGen);
   }
@@ -227,71 +219,74 @@ function Numbers() {
   return (
     <>
       <div>
-        <RangePicker
-          value={dateRange}
-          onChange={(dates) => setDateRange(dates)}
-          format="MM/DD/YYYY"
-        />
-        <Button
-          type="primary"
-          size="small"
-          onClick={() =>
-            setDateRange([
-              dayjs(csvData[0].drawDate).subtract(3, "month"),
-              dayjs(csvData[0].drawDate),
-            ])
-          }
-        >
-          3 month
-        </Button>
-        <Button
-          type="primary"
-          size="small"
-          onClick={() =>
-            setDateRange([
-              dayjs(csvData[0].drawDate).subtract(6, "month"),
-              dayjs(csvData[0].drawDate),
-            ])
-          }
-        >
-          6 month
-        </Button>
-        <Button
-          type="primary"
-          size="small"
-          onClick={() =>
-            setDateRange([
-              dayjs(csvData[0].drawDate).subtract(1, "year"),
-              dayjs(csvData[0].drawDate),
-            ])
-          }
-        >
-          1 year
-        </Button>
-        <Button
-          type="primary"
-          size="small"
-          onClick={() =>
-            setDateRange([
-              dayjs(csvData[0].drawDate).subtract(2, "year"),
-              dayjs(csvData[0].drawDate),
-            ])
-          }
-        >
-          2 year
-        </Button>
-        <Button
-          type="primary"
-          size="small"
-          onClick={() =>
-            setDateRange([
-              dayjs(csvData[csvData.length - 2].drawDate),
-              dayjs(csvData[0].drawDate),
-            ])
-          }
-        >
-          full range
-        </Button>
+        <Space size="small">
+          <RangePicker
+            value={dateRange}
+            onChange={(dates) => setDateRange(dates)}
+            format="MM/DD/YYYY"
+          />
+
+          <Button
+            type="primary"
+            size="small"
+            onClick={() =>
+              setDateRange([
+                dayjs(csvData[0].draw_date).subtract(3, "month"),
+                dayjs(csvData[0].draw_date),
+              ])
+            }
+          >
+            3 month
+          </Button>
+          <Button
+            type="primary"
+            size="small"
+            onClick={() =>
+              setDateRange([
+                dayjs(csvData[0].draw_date).subtract(6, "month"),
+                dayjs(csvData[0].draw_date),
+              ])
+            }
+          >
+            6 month
+          </Button>
+          <Button
+            type="primary"
+            size="small"
+            onClick={() =>
+              setDateRange([
+                dayjs(csvData[0].draw_date).subtract(1, "year"),
+                dayjs(csvData[0].draw_date),
+              ])
+            }
+          >
+            1 year
+          </Button>
+          <Button
+            type="primary"
+            size="small"
+            onClick={() =>
+              setDateRange([
+                dayjs(csvData[0].draw_date).subtract(2, "year"),
+                dayjs(csvData[0].draw_date),
+              ])
+            }
+          >
+            2 year
+          </Button>
+          <Button
+            type="primary"
+            size="small"
+            onClick={() =>
+              setDateRange([
+                dayjs(csvData[csvData.length - 2].draw_date),
+                dayjs(csvData[0].draw_date),
+              ])
+            }
+          >
+            full range
+          </Button>
+        </Space>
       </div>
 
       <div>
@@ -300,49 +295,56 @@ function Numbers() {
           value={selectedDays}
           onChange={(days) => setSelectedDays(days)}
         />
-        <Button
-          type="primary"
-          size="small"
-          onClick={() => setSelectedDays(daysShort)}
-        >
-          all days
-        </Button>
-        <Button type="primary" size="small" onClick={() => setSelectedDays([])}>
-          clear days
-        </Button>
+        <Space size="small">
+          <Button
+            type="primary"
+            size="small"
+            onClick={() => setSelectedDays(daysShort)}
+          >
+            all days
+          </Button>
+          <Button
+            type="primary"
+            size="small"
+            onClick={() => setSelectedDays([])}
+          >
+            clear days
+          </Button>
+        </Space>
       </div>
 
       <div className="main">
         {filteredData.length > 0 ? (
           <>
-            <p>{`[${filteredData[filteredData.length - 2].drawDate} - ${
-              filteredData[0].drawDate
-            }]   ${filteredData.length} draws  `}</p>
+            <p>{`[${filteredData[filteredData.length - 2].draw_date.format(
+              "DD-MM-YYYY"
+            )} - ${filteredData[0].draw_date.format("DD-MM-YYYY")}]   ${
+              filteredData.length
+            } draws  `}</p>
           </>
         ) : (
           <p>select day</p>
         )}
 
         <div className="container">
-          {/* {Object.entries(nums).map(([key, value]) => ( */}
           {allNums.map((key) => (
             <div
               key={key}
               className={`item ${
-                genNumResults.includes(key) ? "highlight" : ""
+                genWinNumResults.includes(key) ? "highlight" : ""
               }`}
               style={{
                 backgroundColor: `color-mix(in srgb, blue  ${
-                  nums[key] ? nums[key].mapped : 0
+                  winNums[key] ? winNums[key].mapped : 0
                 }%, transparent)`,
               }}
             >
               <div className="item-data">
                 <b>{key}</b>
-                {nums[key] && (
+                {winNums[key] && (
                   <>
-                    <p>{nums[key].percentage.toFixed(2)}</p>
-                    <p>{nums[key].frequency}</p>
+                    <p>{winNums[key].percentage.toFixed(2)}</p>
+                    <p>{winNums[key].frequency}</p>
                   </>
                 )}
               </div>
@@ -374,7 +376,7 @@ function Numbers() {
         </Button>
         <div>
           <p>
-            {genNumResults.map((num) => (
+            {genWinNumResults.map((num) => (
               <span key={num}>{num} </span>
             ))}
           </p>
